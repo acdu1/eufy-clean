@@ -35,7 +35,8 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
         self.serial_number = device_info.get("deviceId")  # Usually deviceId is SN
         self.firmware_version = device_info.get("softVersion")
         self.eufy_login = eufy_login
-
+        self.map_service = RobotMapService()
+        
         super().__init__(
             hass,
             _LOGGER,
@@ -187,3 +188,15 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
         For now, just return current state.
         """
         return self.data
+
+        # Update robot position from MQTT/API
+        if robot_data and "position" in robot_data:
+            position = robot_data["position"]
+            self.map_service.update_robot_position(
+                position.get("x", 0),
+                position.get("y", 0)
+            )
+        
+        # Update map image if available
+        if robot_data and "map" in robot_data:
+            self.map_service.set_map_data(robot_data["map"])
