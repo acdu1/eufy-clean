@@ -1,7 +1,7 @@
 # Eufy-Clean (Home Assistant Custom Component)
 
 ## Overview
-This repository is a maintained fork of [eufy-clean](https://github.com/jeppesens/eufy-clean) by [jeppesens](https://github.com/jeppesens), which was originally based on [eufy-clean](https://github.com/martijnpoppen/eufy-clean) by martijnpoppen.
+This repository is a maintained fork of [eufy-clean](https://github.com/acdu1/eufy-clean) by [acdu1](https://github.com/acdu1), which was originally based on [eufy-clean](https://github.com/martijnpoppen/eufy-clean) by martijnpoppen and [eufy-clean](https://github.com/jeppesens/eufy-clean).
 
 This project provides an interface to interact with Eufy cleaning devices via MQTT, with a specific focus on maintaining a robust **Home Assistant Custom Component**. It allows you to control cleaning scenes, specific rooms, and manage station configurations (wash frequency, auto-empty, etc.) directly from your smart home dashboard.
 
@@ -9,7 +9,7 @@ This project provides an interface to interact with Eufy cleaning devices via MQ
 - This repo only has support for MQTT enabled Eufy Vacuums, which means you need to have a device that supports MQTT. E.g the Robovac X10 Pro Omni.
 - This code was ported and tested on a Robovac X10 Pro Omni, but it should work on other models as well 🤞🏼
 - This is a personal project maintained for Home Assistant users. Contributions are welcome!
-
+- The live map feature is still a work in progress. Open an issue if needed!
 ## Features
 
 This custom component provides comprehensive control over your Eufy robot vacuum and its cleaning station:
