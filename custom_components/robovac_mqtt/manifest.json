@@ -1,18 +1,10 @@
 {
-  "domain": "eufy_clean",
-  "name": "Eufy Clean",
+  "domain": "robovac_mqtt",
+  "name": "Eufy Robovac MQTT",
   "codeowners": ["@acdu1"],
   "config_flow": true,
   "documentation": "https://github.com/acdu1/eufy-clean",
   "requirements": [],
-  "version": "1.0.0b1",
-  "frontend": {
-    "maps": [
-      {
-        "url_path": "eufy-robot-map",
-        "title": "Robot Map",
-        "icon": "mdi:robot-vacuum"
-      }
-    ]
-  }
+  "version": "0.1.0",
+  "homeassistant": "2024.1.0"
 }
