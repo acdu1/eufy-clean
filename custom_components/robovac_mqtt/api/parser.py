@@ -499,9 +499,6 @@ def _parse_scene_info(value: Any) -> list[dict[str, Any]]:
         return []
 
 
-
-
-
 def _parse_map_data(value: Any) -> dict[str, Any] | None:
     """Parse Map Data (Universal or RoomParams) from DPS."""
     # UniversalDataResponse
@@ -524,6 +521,7 @@ def _parse_map_data(value: Any) -> dict[str, Any] | None:
         room_params = decode(RoomParams, value, has_length=True)
         if room_params:
             _LOGGER.debug("Decoded RoomParams: %s", room_params)
+<<<<<<< HEAD
         if room_params and (room_params.map_id or room_params.rooms):
             rooms = [{"id": r.id, "name": r.name} for r in room_params.rooms]
             return {"map_id": room_params.map_id, "rooms": _deduplicate_rooms(rooms)}
@@ -625,10 +623,7 @@ def _process_cleaning_parameters(
         _LOGGER.debug("DPS 154: mop_mode not present in cleaning parameters")
 
     # Extract Corner Cleaning Mode
-    if (
-        clean_param.HasField("mop_mode")
-        and clean_param.mop_mode.corner_clean != 0
-    ):
+    if clean_param.HasField("mop_mode"):
         corner_val = clean_param.mop_mode.corner_clean
         changes["corner_cleaning"] = CORNER_CLEANING_NAMES.get(corner_val, "Normal")
         _track_field(state, changes, "corner_cleaning")
