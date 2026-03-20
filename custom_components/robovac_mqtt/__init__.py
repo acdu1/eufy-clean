@@ -73,19 +73,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # But if no devices, nothing to do.
 
     # Check for orphaned devices and log warnings
+    current_device_ids = {c.device_id for c in coordinators}
     device_registry = dr.async_get(hass)
     devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+
     for device_entry in devices:
-        for identifier in device_entry.identifiers:
-            if identifier[0] == DOMAIN:
-                if identifier[1] not in [c.device_id for c in coordinators]:
-                    _LOGGER.warning(
-                        "Device %s (%s) is registered but was not returned by the Eufy API. "
-                        "It will be shown as unavailable. You can manually remove it if it was deleted from your account.",
-                        device_entry.name_by_user or device_entry.name,
-                        identifier[1],
-                    )
-                break
+        # Extract our domain's device ID from identifiers set
+        eufy_id = next(
+            (id[1] for id in device_entry.identifiers if id[0] == DOMAIN), None
+        )
+
+        if eufy_id and eufy_id not in current_device_ids:
+            _LOGGER.warning(
+                "Device %s (%s) is registered but was not returned by the Eufy API. "
+                "It will be shown as unavailable. You can manually remove it if it was deleted from your account.",
+                device_entry.name_by_user or device_entry.name,
+                eufy_id,
+            )
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {"coordinators": coordinators}
