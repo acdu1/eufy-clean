@@ -266,8 +266,15 @@ def _process_other_dps(
                     changes["rooms"] = map_info.get("rooms", [])
                     _track_field(state, changes, "map_id")
 
+            elif key == DPS_MAP["MAP_STREAM"]:
+                _LOGGER.debug("Received MAP_STREAM (166) - Raw: %s", value)
+                # For now just log it to help diagnose C10 room info
+
             elif key == DPS_MAP["FIND_ROBOT"]:
                 changes["find_robot"] = str(value).lower() == "true"
+
+            else:
+                _LOGGER.debug("Received unhandled DPS %s: %s", key, value)
 
         except Exception as e:
             _LOGGER.warning("Error parsing DPS %s: %s", key, e, exc_info=True)
@@ -471,7 +478,9 @@ def _parse_map_data(value: Any) -> dict[str, Any] | None:
         universal_data = decode(UniversalDataResponse, value, has_length=True)
         if universal_data:
             _LOGGER.debug("Decoded UniversalDataResponse: %s", universal_data)
-        if universal_data and universal_data.cur_map_room.map_id:
+        if universal_data and (
+            universal_data.cur_map_room.map_id or universal_data.cur_map_room.data
+        ):
             rooms = [
                 {"id": r.id, "name": r.name} for r in universal_data.cur_map_room.data
             ]
@@ -484,7 +493,7 @@ def _parse_map_data(value: Any) -> dict[str, Any] | None:
         room_params = decode(RoomParams, value, has_length=True)
         if room_params:
             _LOGGER.debug("Decoded RoomParams: %s", room_params)
-        if room_params and room_params.map_id:
+        if room_params and (room_params.map_id or room_params.rooms):
             rooms = [{"id": r.id, "name": r.name} for r in room_params.rooms]
             return {"map_id": room_params.map_id, "rooms": rooms}
     except Exception as e:

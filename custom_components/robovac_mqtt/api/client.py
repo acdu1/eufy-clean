@@ -84,6 +84,7 @@ class EufyCleanClient:
         self._mqtt_client: mqtt.Client | None = None
         self._cert_path: str | None = None
         self._key_path: str | None = None
+        self._client_id: str | None = None
         self._on_message_callback: Callable[[bytes], None] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._connected_event = asyncio.Event()
@@ -113,11 +114,10 @@ class EufyCleanClient:
             )
 
             # Outer wrapper
-            # client_id needs to match what Eufy expects for the session?
-            # MqttConnect uses:
-            # f"android-{self.mqttCredentials['app_name']}-eufy_android_{self.openudid}_{self.mqttCredentials['user_id']}"
+            # Use the actual client_id from connection if available, fallback to generated
             client_id = (
-                f"android-{self.app_name}-eufy_android_{self.openudid}_{self.user_id}"
+                self._client_id
+                or f"android-{self.app_name}-eufy_android_{self.openudid}_{self.user_id}"
             )
 
             mqtt_val = {
@@ -151,6 +151,7 @@ class EufyCleanClient:
             f"android-{self.app_name}-eufy_android_{self.openudid}_{self.user_id}"
             f"-{int(time.time() * 1000)}"
         )
+        self._client_id = client_id
 
         _LOGGER.debug("Initializing MQTT client with ID: %s", client_id)
 
@@ -210,10 +211,17 @@ class EufyCleanClient:
         if rc == 0:
             _LOGGER.info("Connected to MQTT Broker!")
             self._connected_event.set()
-            # Subscribe to specific device topic
-            topic = f"cmd/eufy_home/{self.device_model}/{self.device_id}/res"
-            _LOGGER.debug("Subscribing to %s", topic)
-            client.subscribe(topic)
+            # Subscribe
+            if self.device_id:
+                # Standard topic: cmd/eufy_home/{model}/{sn}/res
+                topic = f"cmd/eufy_home/{self.device_model}/{self.device_id}/res"
+                _LOGGER.debug("Subscribing to %s", topic)
+                client.subscribe(topic)
+
+                # Short topic: cmd/eufy_home/{sn}/res (common for newer AE/Omni models)
+                short_topic = f"cmd/eufy_home/{self.device_id}/res"
+                _LOGGER.debug("Subscribing to %s (short)", short_topic)
+                client.subscribe(short_topic)
         else:
             _LOGGER.error("Failed to connect to MQTT, return code %d", rc)
 
