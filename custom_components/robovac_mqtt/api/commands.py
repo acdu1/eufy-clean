@@ -14,7 +14,7 @@ from ..const import (
 )
 from ..proto.cloud.clean_param_pb2 import CleanParam, CleanParamRequest, Fan
 from ..proto.cloud.consumable_pb2 import ConsumableRequest
-from ..proto.cloud.control_pb2 import AutoClean, ModeCtrlRequest, SelectRoomsClean
+from ..proto.cloud.control_pb2 import ModeCtrlRequest, SelectRoomsClean
 from ..proto.cloud.map_edit_pb2 import MapEditRequest
 from ..proto.cloud.station_pb2 import StationRequest
 from ..utils import encode, encode_message

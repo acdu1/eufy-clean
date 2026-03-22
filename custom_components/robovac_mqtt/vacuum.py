@@ -43,7 +43,7 @@ def _serialize_segments(segments: list[Segment]) -> list[dict[str, Any]]:
 
 def _deserialize_segments(data: list[dict[str, Any]]) -> list[Segment]:
     """Deserialize segments from config entry storage."""
-    return [Segment(id=s["id"], name=s["name"], group=s.get("group")) for s in data]
+    return [Segment(id=str(s["id"]), name=s["name"], group=s.get("group")) for s in data]
 
 
 def _segments_to_attributes(segments: list[Segment]) -> list[dict[str, str]]:
@@ -274,11 +274,23 @@ class RoboVacMQTTEntity(CoordinatorEntity[EufyCleanCoordinator], StateVacuumEnti
         rooms_config = params.get("rooms")
         
         if rooms_config and isinstance(rooms_config, list):
-            # Extract IDs for the clean command
-            room_ids = [int(r["id"]) for r in rooms_config if "id" in r]
+            # Extract and validate IDs for the clean command
+            room_ids: list[int] = []
+            valid_rooms: list[dict[str, Any]] = []
+            for r in rooms_config:
+                if not isinstance(r, dict) or "id" not in r:
+                    continue
+                try:
+                    room_ids.append(int(r["id"]))
+                    valid_rooms.append(r)
+                except (ValueError, TypeError):
+                    _LOGGER.warning("Skipping room with invalid id: %s", r.get("id"))
+
+            if not room_ids:
+                return
 
             # 1. Configure Room Params (Pass the list of dicts)
-            await self._async_send_room_custom(rooms_config, map_id)
+            await self._async_send_room_custom(valid_rooms, map_id)
 
             # 2. Start Clean with Custom Mode
             await self._async_send_room_clean(room_ids, map_id, mode="CUSTOMIZE")

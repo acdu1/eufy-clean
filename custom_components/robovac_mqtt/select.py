@@ -268,7 +268,7 @@ class SceneSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
                     options = self.options
                     if idx < len(options):
                         return options[idx]
-                    return scene["name"]
+                    return None
 
             # Fallback to reported name if available (even if not in options list)
             if self.coordinator.data.current_scene_name:

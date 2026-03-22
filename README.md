@@ -25,7 +25,7 @@ This custom component provides comprehensive control over your Eufy robot vacuum
 ### Cleaning Parameter Controls
 Fine-grained cleaning settings are exposed as select entities (shown only when supported by your device firmware):
 
-- **Suction Level** - `Quiet`, `Standard`, `Turbo`, `Max`, `Boost IQ`
+- **Suction Level** - `Quiet`, `Standard`, `Turbo`, `Max`, `Boost_IQ`
 - **Cleaning Mode** - `Vacuum`, `Mop`, `Vacuum and mop`, `Mopping after sweeping`
 - **Water Level** - `Low`, `Medium`, `High`
 - **Mop Intensity** - `Quiet`, `Automatic`, `Max` (Matter-compatible alias for Water Level)
