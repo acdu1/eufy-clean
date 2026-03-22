@@ -83,10 +83,10 @@ The integration tracks the usage of consumable accessories and allows you to res
 - **Error Tracking**: Real-time error monitoring with detailed descriptions (e.g., "Wheel Stuck", "Sensor Dirty") available as attributes and sensors.
 
 ### Segment Change Detection
-When the vacuum's room map changes (rooms added, removed, or renamed), the integration raises a **Repair issue** in Home Assistant under **Settings → System → Repairs**. This is especially important if you use the [home-assistant-matter-hub](https://github.com/t0bst4r/home-assistant-matter-hub) bridge, where stale room names can cause automations to break. Once you have re-synced your area mapping, the issue will be cleared automatically on the next map update.
+When the vacuum's room map changes (rooms added, removed, or renamed), the integration raises a **Repair issue** in Home Assistant under **Settings → System → Repairs**. This is especially important if you use the [home-assistant-matter-hub](https://github.com/RiDDiX/home-assistant-matter-hub) bridge, where stale room names can cause automations to break. Once you have re-synced your area mapping, the issue will be cleared automatically on the next map update.
 
 ### Home Assistant Matter Hub
-This integration is designed to work alongside [home-assistant-matter-hub](https://github.com/t0bst4r/home-assistant-matter-hub). The following properties are exposed for Matter discovery:
+For exposing your Eufy vacuum to Apple Home, Google Home, or other Matter-compatible ecosystems we recommend [home-assistant-matter-hub](https://github.com/RiDDiX/home-assistant-matter-hub). This integration is designed to work alongside it. The following properties are exposed for Matter discovery:
 - Room segments with guaranteed unique names (duplicates are automatically suffixed, e.g. `Kitchen (2)`) to prevent bridge crashes
 - **Mop Intensity** select entity uses Matter-compatible option names (`Quiet`, `Automatic`, `Max`)
 
