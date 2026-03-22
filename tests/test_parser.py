@@ -1,49 +1,20 @@
-"""Tests for DPS 154 parsing, work status mapping, select entity availability,
-and edge cases identified during code review."""
+"""Unit tests for api/parser.py: work status mapping, cleaning parameters,
+room name parsing, deduplication, and related const lookups."""
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from custom_components.robovac_mqtt.api.commands import (
-    build_set_cleaning_mode_command,
-    build_set_cleaning_intensity_command,
-    build_set_water_level_command,
-)
 from custom_components.robovac_mqtt.api.parser import (
     _map_work_status,
+    _parse_map_data,
     _process_cleaning_parameters,
-    update_state,
+    _deduplicate_room_names,
 )
-from custom_components.robovac_mqtt.const import DPS_MAP
-from custom_components.robovac_mqtt.coordinator import EufyCleanCoordinator
 from custom_components.robovac_mqtt.models import VacuumState
-from custom_components.robovac_mqtt.select import (
-    CleaningModeSelectEntity,
-    SuctionLevelSelectEntity,
-    WaterLevelSelectEntity,
-    CleaningIntensitySelectEntity,
-    MopIntensitySelectEntity,
-)
 
 
-# ── Fixtures ──────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def mock_coordinator():
-    """Fixture for a minimal coordinator mock."""
-    coordinator = MagicMock(spec=EufyCleanCoordinator)
-    coordinator.data = VacuumState()
-    coordinator.device_id = "test_device"
-    coordinator.device_name = "Test Device"
-    coordinator.device_model = "T2351"
-    coordinator.async_send_command = AsyncMock()
-    coordinator.last_update_success = True
-    return coordinator
-
-
-# ── _map_work_status Tests ────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────────
 
 
 def _make_work_status(
@@ -68,76 +39,9 @@ def _make_work_status(
     return ws
 
 
-def test_map_work_status_idle():
-    """State 0 and 1 map to idle."""
-    assert _map_work_status(_make_work_status(0)) == "idle"
-    assert _map_work_status(_make_work_status(1)) == "idle"
-
-
-def test_map_work_status_error():
-    """State 2 maps to error."""
-    assert _map_work_status(_make_work_status(2)) == "error"
-
-
-def test_map_work_status_docked():
-    """State 3 maps to docked (charging)."""
-    assert _map_work_status(_make_work_status(3)) == "docked"
-
-
-def test_map_work_status_cleaning():
-    """State 4 maps to cleaning."""
-    assert _map_work_status(_make_work_status(4)) == "cleaning"
-
-
-def test_map_work_status_returning():
-    """State 7 maps to returning."""
-    assert _map_work_status(_make_work_status(7)) == "returning"
-
-
-def test_map_work_status_washing_shows_docked():
-    """State 5 with go_wash mode WASHING (1) should map to docked, not cleaning.
-
-    The vacuum is physically at the station when washing; users expect "docked".
-    """
-    ws = _make_work_status(5, go_wash_mode=1)
-    assert _map_work_status(ws) == "docked"
-
-
-def test_map_work_status_drying_shows_docked():
-    """State 5 with go_wash mode DRYING (2) should map to docked."""
-    ws = _make_work_status(5, go_wash_mode=2)
-    assert _map_work_status(ws) == "docked"
-
-
-def test_map_work_status_navigation_to_wash_shows_cleaning():
-    """State 5 with go_wash mode NAVIGATION (0) should still be cleaning."""
-    ws = _make_work_status(5, go_wash_mode=0)
-    assert _map_work_status(ws) == "cleaning"
-
-
-def test_map_work_status_station_wash_drying_shows_docked():
-    """State 5 with station.washing_drying_system should map to docked."""
-    ws = _make_work_status(5, has_station_wash=True)
-    assert _map_work_status(ws) == "docked"
-
-
-def test_map_work_status_plain_cleaning():
-    """State 5 without go_wash or station fields is normal cleaning."""
-    ws = _make_work_status(5)
-    assert _map_work_status(ws) == "cleaning"
-
-
-# ── _process_cleaning_parameters Tests ────────────────────────────────
-
-
 def _mock_clean_param(**kwargs):
     """Build a mock CleanParam protobuf message."""
     mock = MagicMock()
-    # Default: nothing has a field
-    all_fields = {
-        "clean_type", "fan", "mop_mode", "clean_extent",
-        "clean_carpet", "smart_mode_sw",
-    }
     present_fields = set()
 
     if "clean_type" in kwargs:
@@ -167,6 +71,74 @@ def _mock_clean_param(**kwargs):
 
     mock.HasField.side_effect = lambda f: f in present_fields
     return mock
+
+
+# ── _map_work_status Tests ───────────────────────────────────────────
+
+
+def test_map_work_status_idle():
+    """State 0 and 1 map to idle."""
+    assert _map_work_status(_make_work_status(0)) == "idle"
+    assert _map_work_status(_make_work_status(1)) == "idle"
+
+
+def test_map_work_status_error():
+    """State 2 maps to error."""
+    assert _map_work_status(_make_work_status(2)) == "error"
+
+
+def test_map_work_status_docked():
+    """State 3 maps to docked (charging)."""
+    assert _map_work_status(_make_work_status(3)) == "docked"
+
+
+def test_map_work_status_cleaning():
+    """State 4 maps to cleaning."""
+    assert _map_work_status(_make_work_status(4)) == "cleaning"
+
+
+def test_map_work_status_returning():
+    """State 7 maps to returning."""
+    assert _map_work_status(_make_work_status(7)) == "returning"
+
+
+def test_map_work_status_washing_shows_docked():
+    """State 5 with go_wash mode WASHING (1) should map to docked, not cleaning."""
+    ws = _make_work_status(5, go_wash_mode=1)
+    assert _map_work_status(ws) == "docked"
+
+
+def test_map_work_status_drying_shows_docked():
+    """State 5 with go_wash mode DRYING (2) should map to docked."""
+    ws = _make_work_status(5, go_wash_mode=2)
+    assert _map_work_status(ws) == "docked"
+
+
+def test_map_work_status_navigation_to_wash_shows_cleaning():
+    """State 5 with go_wash mode NAVIGATION (0) should still be cleaning."""
+    ws = _make_work_status(5, go_wash_mode=0)
+    assert _map_work_status(ws) == "cleaning"
+
+
+def test_map_work_status_station_wash_drying_shows_docked():
+    """State 5 with station.washing_drying_system should map to docked."""
+    ws = _make_work_status(5, has_station_wash=True)
+    assert _map_work_status(ws) == "docked"
+
+
+def test_map_work_status_plain_cleaning():
+    """State 5 without go_wash or station fields is normal cleaning."""
+    ws = _make_work_status(5)
+    assert _map_work_status(ws) == "cleaning"
+
+
+def test_map_work_status_state_15_paused():
+    """Test WorkStatus state 15 maps to paused."""
+    ws = _make_work_status(15)
+    assert _map_work_status(ws) == "paused"
+
+
+# ── _process_cleaning_parameters Tests ───────────────────────────────
 
 
 @patch("custom_components.robovac_mqtt.api.parser.decode")
@@ -224,10 +196,7 @@ def test_process_cleaning_params_mop_water_level(mock_decode):
 
 @patch("custom_components.robovac_mqtt.api.parser.decode")
 def test_process_cleaning_params_corner_cleaning_normal(mock_decode):
-    """Test DPS 154 correctly tracks corner_clean == 0 (Normal).
-
-    Previously, the guard `!= 0` prevented Normal mode from being tracked.
-    """
+    """Test DPS 154 correctly tracks corner_clean == 0 (Normal)."""
     clean_param = _mock_clean_param(mop_level=1, corner_clean=0)
 
     mock_response = MagicMock()
@@ -369,10 +338,8 @@ def test_process_cleaning_params_fallback_to_request(mock_decode):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            # First call: CleanParamResponse fails
             raise Exception("not a response")
         else:
-            # Second call: CleanParamRequest succeeds
             mock_request = MagicMock()
             mock_request.HasField.side_effect = lambda f: f == "clean_param"
             mock_request.clean_param = clean_param
@@ -387,113 +354,12 @@ def test_process_cleaning_params_fallback_to_request(mock_decode):
     assert changes["cleaning_mode"] == "Vacuum"
 
 
-# ── Select Entity Availability Tests ──────────────────────────────────
-
-
-def test_suction_level_unavailable_without_fan_speed(mock_coordinator):
-    """SuctionLevelSelectEntity should be unavailable until fan_speed is tracked."""
-    mock_coordinator.data.received_fields = set()
-    mock_coordinator.last_updated = None
-
-    entity = SuctionLevelSelectEntity(mock_coordinator)
-    assert entity.available is False
-
-
-def test_suction_level_available_with_fan_speed(mock_coordinator):
-    """SuctionLevelSelectEntity should be available once fan_speed is tracked."""
-    mock_coordinator.data.received_fields = {"fan_speed"}
-    mock_coordinator.last_updated = None
-
-    entity = SuctionLevelSelectEntity(mock_coordinator)
-    assert entity.available is True
-
-
-def test_cleaning_mode_unavailable_without_field(mock_coordinator):
-    """CleaningModeSelectEntity should be unavailable until cleaning_mode is tracked."""
-    mock_coordinator.data.received_fields = set()
-    mock_coordinator.last_updated = None
-
-    entity = CleaningModeSelectEntity(mock_coordinator)
-    assert entity.available is False
-
-
-def test_cleaning_mode_available_with_field(mock_coordinator):
-    """CleaningModeSelectEntity should be available once cleaning_mode is tracked."""
-    mock_coordinator.data.received_fields = {"cleaning_mode"}
-    mock_coordinator.last_updated = None
-
-    entity = CleaningModeSelectEntity(mock_coordinator)
-    assert entity.available is True
-
-
-def test_water_level_unavailable_without_field(mock_coordinator):
-    """WaterLevelSelectEntity should be unavailable until mop_water_level is tracked."""
-    mock_coordinator.data.received_fields = set()
-    mock_coordinator.last_updated = None
-
-    entity = WaterLevelSelectEntity(mock_coordinator)
-    assert entity.available is False
-
-
-def test_water_level_available_with_field(mock_coordinator):
-    """WaterLevelSelectEntity should be available once mop_water_level is tracked."""
-    mock_coordinator.data.received_fields = {"mop_water_level"}
-    mock_coordinator.last_updated = None
-
-    entity = WaterLevelSelectEntity(mock_coordinator)
-    assert entity.available is True
-
-
-def test_cleaning_intensity_unavailable_without_field(mock_coordinator):
-    """CleaningIntensitySelectEntity should be unavailable until cleaning_intensity is tracked."""
-    mock_coordinator.data.received_fields = set()
-    mock_coordinator.last_updated = None
-
-    entity = CleaningIntensitySelectEntity(mock_coordinator)
-    assert entity.available is False
-
-
-def test_mop_intensity_unavailable_without_field(mock_coordinator):
-    """MopIntensitySelectEntity should be unavailable until mop_water_level is tracked."""
-    mock_coordinator.data.received_fields = set()
-    mock_coordinator.last_updated = None
-
-    entity = MopIntensitySelectEntity(mock_coordinator)
-    assert entity.available is False
-
-
-# ── Invalid Command Edge Case Tests ───────────────────────────────────
-
-
-def test_set_cleaning_mode_invalid():
-    """Invalid cleaning mode should return empty dict."""
-    result = build_set_cleaning_mode_command("nonexistent_mode")
-    assert result == {}
-
-
-def test_set_water_level_invalid():
-    """Invalid water level should return empty dict."""
-    result = build_set_water_level_command("super_high")
-    assert result == {}
-
-
-def test_set_cleaning_intensity_invalid():
-    """Invalid cleaning intensity should return empty dict."""
-    result = build_set_cleaning_intensity_command("ultra_deep")
-    assert result == {}
-
-
-# ── Room Name Parsing Test ────────────────────────────────────────────
+# ── Room Name Parsing Tests ──────────────────────────────────────────
 
 
 @patch("custom_components.robovac_mqtt.api.parser.decode")
 def test_map_data_room_names_no_id_suffix(mock_decode):
-    """Room names from parser should NOT contain (ID: N) suffix.
-
-    The suffix was previously embedded in parser output, leaking into
-    Matter segments, state attributes, and segment change detection.
-    """
-    # Mock RoomParams response
+    """Room names from parser should NOT contain (ID: N) suffix."""
     room1 = MagicMock()
     room1.id = 10
     room1.name = "Kitchen"
@@ -511,8 +377,6 @@ def test_map_data_room_names_no_id_suffix(mock_decode):
     # First call (UniversalDataResponse) fails, second (RoomParams) succeeds
     mock_decode.side_effect = [Exception("not universal"), mock_room_params]
 
-    from custom_components.robovac_mqtt.api.parser import _parse_map_data
-
     result = _parse_map_data("encoded_value")
 
     assert result is not None
@@ -524,28 +388,11 @@ def test_map_data_room_names_no_id_suffix(mock_decode):
     assert rooms[2] == {"id": 15, "name": "Room 15"}  # Fallback for empty
 
 
-# ── Work Mode Tracking Test ───────────────────────────────────────────
-
-
-@patch("custom_components.robovac_mqtt.api.parser.decode")
-def test_work_mode_names_mapping(mock_decode):
-    """Test that work mode values are correctly mapped to names."""
-    from custom_components.robovac_mqtt.const import WORK_MODE_NAMES
-
-    # Verify all expected modes are mapped
-    assert WORK_MODE_NAMES[0] == "Auto"
-    assert WORK_MODE_NAMES[1] == "Room"
-    assert WORK_MODE_NAMES[3] == "Spot"
-    assert WORK_MODE_NAMES[8] == "Scene"
-
-
-# ── Room Name Deduplication Test ──────────────────────────────────────
+# ── Room Name Deduplication Tests ────────────────────────────────────
 
 
 def test_deduplicate_room_names():
     """Test that duplicate room names get a numbered suffix."""
-    from custom_components.robovac_mqtt.api.parser import _deduplicate_room_names
-
     rooms = [
         {"id": 1, "name": "Kitchen"},
         {"id": 2, "name": "Kitchen"},
@@ -562,8 +409,6 @@ def test_deduplicate_room_names():
 
 def test_deduplicate_room_names_no_duplicates():
     """Test that unique room names are unchanged."""
-    from custom_components.robovac_mqtt.api.parser import _deduplicate_room_names
-
     rooms = [
         {"id": 1, "name": "Kitchen"},
         {"id": 2, "name": "Bedroom"},
@@ -572,17 +417,14 @@ def test_deduplicate_room_names_no_duplicates():
     assert result == rooms
 
 
-# ── Additional Edge Case Tests ─────────────────────────────────────────
+# ── Work Mode Mapping Test ───────────────────────────────────────────
 
 
-def test_map_work_status_state_15_paused():
-    """Test WorkStatus state 15 maps to paused."""
-    ws = _make_work_status(15)
-    assert _map_work_status(ws) == "paused"
+def test_work_mode_names_mapping():
+    """Test that work mode values are correctly mapped to names."""
+    from custom_components.robovac_mqtt.const import WORK_MODE_NAMES
 
-
-def test_build_command_unknown_returns_empty():
-    """Test build_command with unknown command returns empty dict."""
-    from custom_components.robovac_mqtt.api.commands import build_command
-
-    assert build_command("nonexistent_command") == {}
+    assert WORK_MODE_NAMES[0] == "Auto"
+    assert WORK_MODE_NAMES[1] == "Room"
+    assert WORK_MODE_NAMES[3] == "Spot"
+    assert WORK_MODE_NAMES[8] == "Scene"

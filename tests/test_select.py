@@ -16,6 +16,7 @@ from custom_components.robovac_mqtt.select import (
     MopIntensitySelectEntity,
     RoomSelectEntity,
     SceneSelectEntity,
+    SuctionLevelSelectEntity,
     WaterLevelSelectEntity,
 )
 
@@ -29,6 +30,7 @@ def mock_coordinator():
     coordinator.device_name = "Test Device"
     coordinator.device_model = "T2118"
     coordinator.async_send_command = AsyncMock()
+    coordinator.last_update_success = True
     return coordinator
 
 
@@ -342,4 +344,93 @@ def test_dock_select_unavailable_no_cfg(mock_coordinator):
         ["A", "B"], lambda cfg: "A", lambda cfg, val: None,
     )
 
+    assert entity.available is False
+
+
+def test_scene_select_current_option_dedup(mock_coordinator):
+    """Test current_option returns deduplicated name for duplicate scene names."""
+    mock_coordinator.data.scenes = [
+        {"id": 1, "name": "Clean"},
+        {"id": 2, "name": "Clean"},
+    ]
+    mock_coordinator.data.current_scene_id = 2
+    mock_coordinator.data.current_scene_name = "Clean"
+
+    entity = SceneSelectEntity(mock_coordinator)
+    # The second "Clean" should be returned as "Clean (2)" to match options
+    assert entity.current_option == "Clean (2)"
+
+
+# ── Select Entity Availability Tests ─────────────────────────────────
+
+
+def test_suction_level_unavailable_without_fan_speed(mock_coordinator):
+    """SuctionLevelSelectEntity should be unavailable until fan_speed is tracked."""
+    mock_coordinator.data.received_fields = set()
+    mock_coordinator.last_updated = None
+
+    entity = SuctionLevelSelectEntity(mock_coordinator)
+    assert entity.available is False
+
+
+def test_suction_level_available_with_fan_speed(mock_coordinator):
+    """SuctionLevelSelectEntity should be available once fan_speed is tracked."""
+    mock_coordinator.data.received_fields = {"fan_speed"}
+    mock_coordinator.last_updated = None
+
+    entity = SuctionLevelSelectEntity(mock_coordinator)
+    assert entity.available is True
+
+
+def test_cleaning_mode_unavailable_without_field(mock_coordinator):
+    """CleaningModeSelectEntity should be unavailable until cleaning_mode is tracked."""
+    mock_coordinator.data.received_fields = set()
+    mock_coordinator.last_updated = None
+
+    entity = CleaningModeSelectEntity(mock_coordinator)
+    assert entity.available is False
+
+
+def test_cleaning_mode_available_with_field(mock_coordinator):
+    """CleaningModeSelectEntity should be available once cleaning_mode is tracked."""
+    mock_coordinator.data.received_fields = {"cleaning_mode"}
+    mock_coordinator.last_updated = None
+
+    entity = CleaningModeSelectEntity(mock_coordinator)
+    assert entity.available is True
+
+
+def test_water_level_unavailable_without_field(mock_coordinator):
+    """WaterLevelSelectEntity should be unavailable until mop_water_level is tracked."""
+    mock_coordinator.data.received_fields = set()
+    mock_coordinator.last_updated = None
+
+    entity = WaterLevelSelectEntity(mock_coordinator)
+    assert entity.available is False
+
+
+def test_water_level_available_with_field(mock_coordinator):
+    """WaterLevelSelectEntity should be available once mop_water_level is tracked."""
+    mock_coordinator.data.received_fields = {"mop_water_level"}
+    mock_coordinator.last_updated = None
+
+    entity = WaterLevelSelectEntity(mock_coordinator)
+    assert entity.available is True
+
+
+def test_cleaning_intensity_unavailable_without_field(mock_coordinator):
+    """CleaningIntensitySelectEntity should be unavailable until cleaning_intensity is tracked."""
+    mock_coordinator.data.received_fields = set()
+    mock_coordinator.last_updated = None
+
+    entity = CleaningIntensitySelectEntity(mock_coordinator)
+    assert entity.available is False
+
+
+def test_mop_intensity_unavailable_without_field(mock_coordinator):
+    """MopIntensitySelectEntity should be unavailable until mop_water_level is tracked."""
+    mock_coordinator.data.received_fields = set()
+    mock_coordinator.last_updated = None
+
+    entity = MopIntensitySelectEntity(mock_coordinator)
     assert entity.available is False

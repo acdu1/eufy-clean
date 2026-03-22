@@ -48,6 +48,30 @@ def encode_varint(n: int) -> bytes:
     return bytes(out)
 
 
+def deduplicate_names(names: list[str]) -> list[str]:
+    """Ensure names are unique by appending a suffix to duplicates.
+
+    e.g. ["Kitchen", "Kitchen", "Bedroom"] -> ["Kitchen", "Kitchen (2)", "Bedroom"].
+    """
+    counts: dict[str, int] = {}
+    for name in names:
+        counts[name] = counts.get(name, 0) + 1
+
+    duplicated = {n for n, c in counts.items() if c > 1}
+    if not duplicated:
+        return names
+
+    seen: dict[str, int] = {}
+    result: list[str] = []
+    for name in names:
+        if name in duplicated:
+            seen[name] = seen.get(name, 0) + 1
+            result.append(f"{name} ({seen[name]})" if seen[name] > 1 else name)
+        else:
+            result.append(name)
+    return result
+
+
 def encode_message(message: Message, has_length: bool = True) -> str:
     out = message.SerializeToString(deterministic=False)
 

@@ -65,3 +65,10 @@ def test_encode_decode_roundtrip():
 
     result = decode(ErrorCode, encoded, has_length=True)
     assert list(result.error) == [99, 100]
+
+
+def test_deduplicate_names():
+    from custom_components.robovac_mqtt.utils import deduplicate_names
+    assert deduplicate_names(["A", "B", "A", "C", "A"]) == ["A", "B", "A (2)", "C", "A (3)"]
+    assert deduplicate_names(["X", "Y"]) == ["X", "Y"]
+    assert deduplicate_names([]) == []

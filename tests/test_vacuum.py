@@ -2,7 +2,6 @@
 
 # pylint: disable=redefined-outer-name, unused-argument
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

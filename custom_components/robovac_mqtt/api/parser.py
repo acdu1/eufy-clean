@@ -34,7 +34,7 @@ from ..proto.cloud.station_pb2 import StationResponse
 from ..proto.cloud.stream_pb2 import RoomParams
 from ..proto.cloud.universal_data_pb2 import UniversalDataResponse
 from ..proto.cloud.work_status_pb2 import WorkStatus
-from ..utils import decode
+from ..utils import decode, deduplicate_names
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -507,26 +507,9 @@ def _deduplicate_room_names(rooms: list[dict[str, Any]]) -> list[dict[str, Any]]
 
     e.g. two rooms named "Kitchen" become "Kitchen" and "Kitchen (2)".
     """
-    name_counts: dict[str, int] = {}
-    for room in rooms:
-        name = room["name"]
-        name_counts[name] = name_counts.get(name, 0) + 1
-
-    # Only process names that actually have duplicates
-    duplicated_names = {n for n, c in name_counts.items() if c > 1}
-    if not duplicated_names:
-        return rooms
-
-    seen: dict[str, int] = {}
-    result: list[dict[str, Any]] = []
-    for room in rooms:
-        name = room["name"]
-        if name in duplicated_names:
-            seen[name] = seen.get(name, 0) + 1
-            if seen[name] > 1:
-                room = {**room, "name": f"{name} ({seen[name]})"}
-        result.append(room)
-    return result
+    names = [room["name"] for room in rooms]
+    deduped = deduplicate_names(names)
+    return [{**room, "name": name} for room, name in zip(rooms, deduped)]
 
 
 def _parse_map_data(value: Any) -> dict[str, Any] | None:

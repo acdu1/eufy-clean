@@ -23,32 +23,9 @@ from .const import (
     EUFY_CLEAN_WATER_LEVELS,
 )
 from .coordinator import EufyCleanCoordinator
+from .utils import deduplicate_names
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _deduplicate_names(names: list[str]) -> list[str]:
-    """Ensure option names are unique by appending a suffix to duplicates.
-
-    e.g. ["Kitchen", "Kitchen", "Bedroom"] -> ["Kitchen", "Kitchen (2)", "Bedroom"].
-    """
-    counts: dict[str, int] = {}
-    for name in names:
-        counts[name] = counts.get(name, 0) + 1
-
-    duplicated = {n for n, c in counts.items() if c > 1}
-    if not duplicated:
-        return names
-
-    seen: dict[str, int] = {}
-    result: list[str] = []
-    for name in names:
-        if name in duplicated:
-            seen[name] = seen.get(name, 0) + 1
-            result.append(f"{name} ({seen[name]})" if seen[name] > 1 else name)
-        else:
-            result.append(name)
-    return result
 
 
 _MOP_INTENSITY_TO_WATER_LEVEL = {
@@ -278,21 +255,20 @@ class SceneSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
     def options(self) -> list[str]:
         """Return available scenes."""
         names = [s["name"] for s in self.coordinator.data.scenes if "name" in s]
-        return _deduplicate_names(names)
+        return deduplicate_names(names)
 
     @property
     def current_option(self) -> str | None:
         """Return the currently active scene."""
         current_id = self.coordinator.data.current_scene_id
-        # Check by ID first if we have a scene running
         if current_id > 0:
-            # Try to match by ID in the list to return the name from the list
-            # This ensures we return a valid option even if the name format varies slightly
-            scene = next(
-                (s for s in self.coordinator.data.scenes if s["id"] == current_id), None
-            )
-            if scene and "name" in scene:
-                return scene["name"]
+            named_scenes = [s for s in self.coordinator.data.scenes if "name" in s]
+            for idx, scene in enumerate(named_scenes):
+                if scene["id"] == current_id:
+                    options = self.options
+                    if idx < len(options):
+                        return options[idx]
+                    return scene["name"]
 
             # Fallback to reported name if available (even if not in options list)
             if self.coordinator.data.current_scene_name:
@@ -341,7 +317,7 @@ class RoomSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
     def options(self) -> list[str]:
         """Return available rooms."""
         names = [r["name"] for r in self.coordinator.data.rooms if "name" in r]
-        return _deduplicate_names(names)
+        return deduplicate_names(names)
 
     @property
     def current_option(self) -> str | None:
