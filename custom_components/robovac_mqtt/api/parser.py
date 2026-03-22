@@ -303,6 +303,9 @@ def _process_other_dps(
             elif key == DPS_MAP["FIND_ROBOT"]:
                 changes["find_robot"] = str(value).lower() == "true"
 
+            else:
+                _LOGGER.debug("Received unhandled DPS %s: %s", key, value)
+
         except Exception as e:
             _LOGGER.warning("Error parsing DPS %s: %s", key, e, exc_info=True)
 
@@ -533,7 +536,9 @@ def _parse_map_data(value: Any) -> dict[str, Any] | None:
         universal_data = decode(UniversalDataResponse, value, has_length=True)
         if universal_data:
             _LOGGER.debug("Decoded UniversalDataResponse: %s", universal_data)
-        if universal_data and universal_data.cur_map_room.map_id:
+        if universal_data and (
+            universal_data.cur_map_room.map_id or universal_data.cur_map_room.data
+        ):
             rooms = []
             for r in universal_data.cur_map_room.data:
                 name = (r.name or "").strip() or f"Room {r.id}"
@@ -547,7 +552,7 @@ def _parse_map_data(value: Any) -> dict[str, Any] | None:
         room_params = decode(RoomParams, value, has_length=True)
         if room_params:
             _LOGGER.debug("Decoded RoomParams: %s", room_params)
-        if room_params and room_params.map_id:
+        if room_params and (room_params.map_id or room_params.rooms):
             rooms = []
             for r in room_params.rooms:
                 name = (r.name or "").strip() or f"Room {r.id}"
