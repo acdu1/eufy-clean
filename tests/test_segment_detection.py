@@ -99,7 +99,9 @@ async def test_vacuum_entity_with_segment_detection(
         mock_connect.call_args[0][1]
         == f"robovac_mqtt_{mock_coordinator.device_id}_rooms_updated"
     )
-    assert mock_connect.call_args[0][2] is entity._check_for_segment_changes
+    callback_arg = mock_connect.call_args[0][2]
+    assert callback_arg.__self__ is entity
+    assert callback_arg.__func__ is RoboVacMQTTEntity._check_for_segment_changes
 
 
 def test_last_seen_segments_property(mock_coordinator, mock_config_entry):
