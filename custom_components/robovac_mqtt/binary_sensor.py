@@ -85,9 +85,11 @@ class RoboVacBinarySensor(CoordinatorEntity[EufyCleanCoordinator], BinarySensorE
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not super().available:
+            return False
         if self._availability_fn is not None:
             return self._availability_fn(self.coordinator.data)
-        return super().available
+        return True
 
     @property
     def is_on(self) -> bool | None:
