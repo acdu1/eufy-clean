@@ -43,6 +43,17 @@ async def async_setup_entry(
             )
         )
 
+        # Child Lock (from DPS 176 UnisettingResponse, read-only)
+        entities.append(
+            RoboVacBinarySensor(
+                coordinator,
+                "child_lock",
+                "Child Lock",
+                lambda s: s.child_lock,
+                category=EntityCategory.DIAGNOSTIC,
+            )
+        )
+
     async_add_entities(entities)
 
 

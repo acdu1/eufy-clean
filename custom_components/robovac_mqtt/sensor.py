@@ -10,7 +10,12 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, EntityCategory
+from homeassistant.const import (
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    UnitOfLength,
+    EntityCategory,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -159,6 +164,135 @@ async def async_setup_entry(
             )
         )
 
+        # Active Rooms sensor — unavailable when not room-cleaning
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "active_rooms",
+                "Active Rooms",
+                lambda s: s.active_room_names or None,
+                device_class=None,
+                unit=None,
+                state_class=None,
+                icon="mdi:floor-plan",
+                category=EntityCategory.DIAGNOSTIC,
+                availability_fn=lambda s: bool(s.active_room_ids),
+                extra_state_attributes_fn=lambda s: {
+                    "room_ids": s.active_room_ids,
+                    "zone_count": s.active_zone_count,
+                },
+            )
+        )
+
+        # WiFi Signal Strength (from DPS 176 UnisettingResponse)
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "wifi_signal",
+                "WiFi Signal Strength",
+                lambda s: s.wifi_signal,
+                device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+                unit=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:wifi",
+                category=EntityCategory.DIAGNOSTIC,
+                availability_fn=lambda s: "wifi_signal" in s.received_fields,
+                enabled_default=False,
+            )
+        )
+
+        # WiFi SSID (from DPS 169 DeviceInfo)
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "wifi_ssid",
+                "WiFi SSID",
+                lambda s: s.wifi_ssid or None,
+                icon="mdi:wifi",
+                category=EntityCategory.DIAGNOSTIC,
+                availability_fn=lambda s: "wifi_ssid" in s.received_fields,
+                enabled_default=False,
+            )
+        )
+
+        # WiFi IP Address (from DPS 169 DeviceInfo)
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "wifi_ip",
+                "IP Address",
+                lambda s: s.wifi_ip or None,
+                icon="mdi:ip-network",
+                category=EntityCategory.DIAGNOSTIC,
+                availability_fn=lambda s: "wifi_ip" in s.received_fields,
+                enabled_default=False,
+            )
+        )
+
+        # Robot Position - raw (from DPS 179 telemetry, diagnostic)
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "robot_position_x",
+                "Robot Position X (raw)",
+                lambda s: s.robot_position_x,
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:crosshairs-gps",
+                category=EntityCategory.DIAGNOSTIC,
+                availability_fn=lambda s: "robot_position" in s.received_fields,
+                enabled_default=False,
+            )
+        )
+
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "robot_position_y",
+                "Robot Position Y (raw)",
+                lambda s: s.robot_position_y,
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:crosshairs-gps",
+                category=EntityCategory.DIAGNOSTIC,
+                availability_fn=lambda s: "robot_position" in s.received_fields,
+                enabled_default=False,
+            )
+        )
+
+        # Robot Position - relative to dock (meters)
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "robot_distance_x",
+                "Robot Distance X",
+                lambda s: s.robot_rel_x,
+                state_class=SensorStateClass.MEASUREMENT,
+                unit=UnitOfLength.METERS,
+                icon="mdi:crosshairs-gps",
+                availability_fn=lambda s: (
+                    "robot_position" in s.received_fields
+                    and s.dock_ref_x is not None
+                ),
+                suggested_display_precision=2,
+            )
+        )
+
+        entities.append(
+            RoboVacSensor(
+                coordinator,
+                "robot_distance_y",
+                "Robot Distance Y",
+                lambda s: s.robot_rel_y,
+                state_class=SensorStateClass.MEASUREMENT,
+                unit=UnitOfLength.METERS,
+                icon="mdi:crosshairs-gps",
+                availability_fn=lambda s: (
+                    "robot_position" in s.received_fields
+                    and s.dock_ref_y is not None
+                ),
+                suggested_display_precision=2,
+            )
+        )
+
         # Accessory Sensors
         accessories = [
             ("filter_usage", "Filter Remaining", "mdi:air-filter"),
@@ -227,6 +361,8 @@ class RoboVacSensor(CoordinatorEntity[EufyCleanCoordinator], SensorEntity):
             Callable[[VacuumState], dict[str, Any]] | None
         ) = None,
         availability_fn: Callable[[VacuumState], bool] | None = None,
+        enabled_default: bool = True,
+        suggested_display_precision: int | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -241,6 +377,7 @@ class RoboVacSensor(CoordinatorEntity[EufyCleanCoordinator], SensorEntity):
         # Result: sensor.robovac_water_level (Safer, avoids collisions)
         self._attr_has_entity_name = True
         self._attr_name = name_suffix
+        self._attr_entity_registry_enabled_default = enabled_default
 
         self._attr_device_info = coordinator.device_info
 
@@ -250,6 +387,8 @@ class RoboVacSensor(CoordinatorEntity[EufyCleanCoordinator], SensorEntity):
         self._attr_entity_category = category
         if icon:
             self._attr_icon = icon
+        if suggested_display_precision is not None:
+            self._attr_suggested_display_precision = suggested_display_precision
 
     @property
     def available(self) -> bool:
