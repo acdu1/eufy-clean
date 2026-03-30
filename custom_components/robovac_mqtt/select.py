@@ -253,7 +253,6 @@ class SceneSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
         self._attr_has_entity_name = True
         self._attr_name = "Scene"
         self._attr_icon = "mdi:play-circle-outline"
-        self._attr_entity_category = EntityCategory.CONFIG
 
         self._attr_device_info = coordinator.device_info
 
@@ -308,7 +307,6 @@ class RoomSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
         self._attr_has_entity_name = True
         self._attr_name = "Clean Room"
         self._attr_icon = "mdi:door-open"
-        self._attr_entity_category = EntityCategory.CONFIG
 
         self._attr_device_info = coordinator.device_info
 
