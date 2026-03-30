@@ -218,9 +218,7 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
         """Set active cleaning targets on state (called when HA sends commands)."""
         rooms = self.data.rooms
         if room_ids:
-            room_lookup = {
-                r["id"]: r.get("name", f"Room {r['id']}") for r in rooms
-            }
+            room_lookup = {r["id"]: r.get("name", f"Room {r['id']}") for r in rooms}
             names = [room_lookup.get(rid, f"Room {rid}") for rid in room_ids]
             new_state = replace(
                 self.data,

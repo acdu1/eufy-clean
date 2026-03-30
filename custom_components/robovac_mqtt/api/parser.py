@@ -35,9 +35,9 @@ from ..proto.cloud.clean_statistics_pb2 import CleanStatistics
 from ..proto.cloud.consumable_pb2 import ConsumableResponse
 from ..proto.cloud.control_pb2 import ModeCtrlRequest
 from ..proto.cloud.error_code_pb2 import ErrorCode
+from ..proto.cloud.multi_maps_pb2 import MultiMapsManageResponse
 from ..proto.cloud.scene_pb2 import SceneResponse
 from ..proto.cloud.station_pb2 import StationResponse
-from ..proto.cloud.multi_maps_pb2 import MultiMapsManageResponse
 from ..proto.cloud.stream_pb2 import RoomParams
 from ..proto.cloud.unisetting_pb2 import UnisettingResponse
 from ..proto.cloud.universal_data_pb2 import UniversalDataResponse
@@ -349,7 +349,11 @@ def _process_other_dps(
     """Process other DPS items."""
     for key, value in dps.items():
         # Specialized keys are handled in their respective functions
-        if key in (DPS_MAP["WORK_STATUS"], DPS_MAP["STATION_STATUS"], DPS_MAP["PLAY_PAUSE"]):
+        if key in (
+            DPS_MAP["WORK_STATUS"],
+            DPS_MAP["STATION_STATUS"],
+            DPS_MAP["PLAY_PAUSE"],
+        ):
             continue
 
         try:
@@ -448,7 +452,8 @@ def _process_other_dps(
                 pos = _parse_robot_telemetry(value)
                 _LOGGER.debug(
                     "DPS 179 telemetry: parsed=%s, raw_b64=%.60s...",
-                    pos, value,
+                    pos,
+                    value,
                 )
                 if pos:
                     raw_x, raw_y = pos["x"], pos["y"]
@@ -751,7 +756,8 @@ def _parse_multi_map_response(value: Any) -> dict[str, Any] | None:
         resp = decode(MultiMapsManageResponse, value)
         _LOGGER.debug(
             "Decoded MultiMapsManageResponse: method=%s, result=%s",
-            resp.method, resp.result,
+            resp.method,
+            resp.result,
         )
         return None
     except Exception as e:

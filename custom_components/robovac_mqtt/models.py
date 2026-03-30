@@ -89,12 +89,12 @@ class VacuumState:
 
     # Device settings (from DPS 176 UnisettingResponse)
     wifi_signal: float = -100.0  # AP signal strength in dBm (converted from 0-100%)
-    child_lock: bool = False     # Children lock switch
+    child_lock: bool = False  # Children lock switch
 
     # Device network info (from DPS 169, DeviceInfo proto)
-    device_mac: str = ""   # Device MAC address
-    wifi_ssid: str = ""    # Connected WiFi network name
-    wifi_ip: str = ""      # Device IP address
+    device_mac: str = ""  # Device MAC address
+    wifi_ssid: str = ""  # Connected WiFi network name
+    wifi_ip: str = ""  # Device IP address
 
     # Robot telemetry (from DPS 179, no known proto definition)
     robot_position_x: int = 0  # Raw map X coordinate (firmware-internal grid)

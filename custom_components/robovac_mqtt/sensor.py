@@ -13,8 +13,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-    UnitOfLength,
     EntityCategory,
+    UnitOfLength,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -269,8 +269,7 @@ async def async_setup_entry(
                 unit=UnitOfLength.METERS,
                 icon="mdi:crosshairs-gps",
                 availability_fn=lambda s: (
-                    "robot_position" in s.received_fields
-                    and s.dock_ref_x is not None
+                    "robot_position" in s.received_fields and s.dock_ref_x is not None
                 ),
                 suggested_display_precision=2,
             )
@@ -286,8 +285,7 @@ async def async_setup_entry(
                 unit=UnitOfLength.METERS,
                 icon="mdi:crosshairs-gps",
                 availability_fn=lambda s: (
-                    "robot_position" in s.received_fields
-                    and s.dock_ref_y is not None
+                    "robot_position" in s.received_fields and s.dock_ref_y is not None
                 ),
                 suggested_display_precision=2,
             )
