@@ -17,6 +17,7 @@ from ..proto.cloud.consumable_pb2 import ConsumableRequest
 from ..proto.cloud.control_pb2 import ModeCtrlRequest, SelectRoomsClean
 from ..proto.cloud.map_edit_pb2 import MapEditRequest
 from ..proto.cloud.station_pb2 import StationRequest
+from ..proto.cloud.unisetting_pb2 import UnisettingRequest
 from ..utils import encode, encode_message
 
 _LOGGER = logging.getLogger(__name__)
@@ -288,6 +289,12 @@ def build_find_robot_command(active: bool) -> dict[str, Any]:
     return {DPS_MAP["FIND_ROBOT"]: active}
 
 
+def build_set_child_lock_command(active: bool) -> dict[str, str]:
+    """Build command to toggle the child lock setting."""
+    value = encode(UnisettingRequest, {"children_lock": {"value": active}})
+    return {DPS_MAP["UNSETTING"]: value}
+
+
 def build_command(command: str, **kwargs: Any) -> dict[str, Any]:
     """Unified command builder."""
     cmd = command.lower()
@@ -352,5 +359,7 @@ def build_command(command: str, **kwargs: Any) -> dict[str, Any]:
         return build_set_auto_action_cfg_command(kwargs.get("cfg", {}))
     if cmd == "reset_accessory":
         return build_reset_accessory_command(int(kwargs.get("reset_type", 0)))
+    if cmd == "set_child_lock":
+        return build_set_child_lock_command(bool(kwargs.get("active", True)))
 
     return {}
