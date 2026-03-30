@@ -492,9 +492,19 @@ class RoboVacMQTTEntity(CoordinatorEntity[EufyCleanCoordinator], StateVacuumEnti
         """Send a raw command to the vacuum."""
         if command == "scene_clean":
             if isinstance(params, dict) and "scene_id" in params:
-                await self.coordinator.async_send_command(
-                    build_command("scene_clean", scene_id=params["scene_id"])
+                scene_id = params["scene_id"]
+                scene_name = next(
+                    (
+                        scene.get("name")
+                        for scene in self.coordinator.data.scenes
+                        if scene["id"] == scene_id
+                    ),
+                    None,
                 )
+                await self.coordinator.async_send_command(
+                    build_command("scene_clean", scene_id=scene_id)
+                )
+                self.coordinator.set_active_scene(scene_id, scene_name)
             return
 
         if command == "room_clean" and isinstance(params, dict):

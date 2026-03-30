@@ -229,6 +229,8 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
                 active_room_ids=room_ids,
                 active_room_names=", ".join(names),
                 active_zone_count=0,
+                current_scene_id=0,
+                current_scene_name=None,
                 received_fields=self.data.received_fields | {"active_room_ids"},
             )
         else:
@@ -237,8 +239,23 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
                 active_room_ids=[],
                 active_room_names="",
                 active_zone_count=zone_count,
+                current_scene_id=0,
+                current_scene_name=None,
                 received_fields=self.data.received_fields | {"active_room_ids"},
             )
+        self.async_set_updated_data(new_state)
+
+    @callback
+    def set_active_scene(self, scene_id: int, scene_name: str | None) -> None:
+        """Set the active cleaning scene on state."""
+        new_state = replace(
+            self.data,
+            current_scene_id=scene_id,
+            current_scene_name=scene_name,
+            active_room_ids=[],
+            active_room_names="",
+            active_zone_count=0,
+        )
         self.async_set_updated_data(new_state)
 
     async def async_send_command(self, command_dict: dict[str, Any]) -> None:

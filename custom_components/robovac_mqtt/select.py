@@ -293,6 +293,7 @@ class SceneSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
 
         command = build_command("scene_clean", scene_id=scene_id)
         await self.coordinator.async_send_command(command)
+        self.coordinator.set_active_scene(scene_id, scene.get("name"))
 
         self.async_write_ha_state()
 
@@ -344,6 +345,7 @@ class RoomSelectEntity(CoordinatorEntity[EufyCleanCoordinator], SelectEntity):
 
         command = build_command("room_clean", room_ids=[room_id], map_id=map_id)
         await self.coordinator.async_send_command(command)
+        self.coordinator.set_active_cleaning_targets(room_ids=[room_id])
 
         self.async_write_ha_state()
 

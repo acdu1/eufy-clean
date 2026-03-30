@@ -25,6 +25,28 @@ from .coordinator import EufyCleanCoordinator, VacuumState
 _LOGGER = logging.getLogger(__name__)
 
 
+def _active_rooms_value(state: VacuumState) -> str | None:
+    """Return a display label for the current active cleaning target."""
+    if state.active_room_names:
+        return state.active_room_names
+    if state.current_scene_name:
+        return state.current_scene_name
+    if state.active_zone_count:
+        suffix = "" if state.active_zone_count == 1 else "s"
+        return f"{state.active_zone_count} zone{suffix}"
+    return None
+
+
+def _active_rooms_available(state: VacuumState) -> bool:
+    """Return whether any active cleaning target is currently known."""
+    return bool(
+        state.active_room_ids
+        or state.current_scene_id
+        or state.current_scene_name
+        or state.active_zone_count
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -163,21 +185,23 @@ async def async_setup_entry(
             )
         )
 
-        # Active Rooms sensor — unavailable when not room-cleaning
+        # Active cleaning target sensor
         entities.append(
             RoboVacSensor(
                 coordinator,
-                "active_rooms",
-                "Active Rooms",
-                lambda s: s.active_room_names or None,
+                "active_cleaning_target",
+                "Active Cleaning Target",
+                _active_rooms_value,
                 device_class=None,
                 unit=None,
                 state_class=None,
                 icon="mdi:floor-plan",
                 category=EntityCategory.DIAGNOSTIC,
-                availability_fn=lambda s: bool(s.active_room_ids),
+                availability_fn=_active_rooms_available,
                 extra_state_attributes_fn=lambda s: {
                     "room_ids": s.active_room_ids,
+                    "scene_id": s.current_scene_id,
+                    "scene_name": s.current_scene_name,
                     "zone_count": s.active_zone_count,
                 },
             )

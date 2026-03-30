@@ -296,6 +296,14 @@ def _process_work_status(
         if work_status.HasField("current_scene"):
             changes["current_scene_id"] = work_status.current_scene.id
             changes["current_scene_name"] = work_status.current_scene.name
+            if (
+                state.active_room_ids
+                or state.active_room_names
+                or state.active_zone_count
+            ):
+                changes["active_room_ids"] = []
+                changes["active_room_names"] = ""
+                changes["active_zone_count"] = 0
 
         # 2. If explicit Mode provided and it's NOT Scene (8), clear it.
         # 8 = SCENE mode
@@ -309,9 +317,19 @@ def _process_work_status(
             changes["current_scene_id"] = 0
             changes["current_scene_name"] = None
 
-        # Clear active cleaning targets when no longer actively cleaning
+        # Clear active cleaning targets when the task is actually over.
+        # Docked can also mean an in-progress wash/dry cycle, so rely on the
+        # derived task_status instead of duplicating that interpretation here.
         activity = changes.get("activity")
-        if activity in ("idle", "docked", "error"):
+        task_status = changes.get("task_status")
+        should_clear_targets = (
+            activity in ("idle", "error") and state.activity not in ("idle", "error")
+        ) or (
+            activity == "docked"
+            and task_status == "Completed"
+            and state.task_status != "Completed"
+        )
+        if should_clear_targets:
             if state.active_room_ids or state.active_zone_count:
                 changes["active_room_ids"] = []
                 changes["active_room_names"] = ""
@@ -335,6 +353,11 @@ def _process_play_pause(
 
         if mode_ctrl.HasField("select_rooms_clean"):
             room_ids = [r.id for r in mode_ctrl.select_rooms_clean.rooms]
+            if not room_ids:
+                _LOGGER.debug(
+                    "Ignoring START_SELECT_ROOMS_CLEAN without room IDs; preserving existing active targets."
+                )
+                return
             changes["active_room_ids"] = room_ids
             room_lookup = {
                 r["id"]: r.get("name", f"Room {r['id']}") for r in state.rooms
@@ -342,12 +365,16 @@ def _process_play_pause(
             names = [room_lookup.get(rid, f"Room {rid}") for rid in room_ids]
             changes["active_room_names"] = ", ".join(names)
             changes["active_zone_count"] = 0
+            changes["current_scene_id"] = 0
+            changes["current_scene_name"] = None
             _track_field(state, changes, "active_room_ids")
 
         elif mode_ctrl.HasField("select_zones_clean"):
             changes["active_zone_count"] = len(mode_ctrl.select_zones_clean.zones)
             changes["active_room_ids"] = []
             changes["active_room_names"] = ""
+            changes["current_scene_id"] = 0
+            changes["current_scene_name"] = None
             _track_field(state, changes, "active_room_ids")
 
         # Scene: intentionally skipped (already tracked via WorkStatus.current_scene)

@@ -265,3 +265,94 @@ def test_update_state_undisturbed():
     assert new_state.dnd_end_hour == 8
     assert new_state.dnd_end_minute == 0
     assert "do_not_disturb" in changes["received_fields"]
+
+
+def test_completed_docked_refresh_keeps_cleared_targets():
+    """Test repeated completed docked updates keep targets cleared."""
+    state = VacuumState(
+        activity="docked",
+        task_status="Completed",
+        active_room_ids=[],
+        active_room_names="",
+    )
+
+    dps = {DPS_MAP["WORK_STATUS"]: "ChADGgByAiIAegA="}
+    new_state, _ = update_state(state, dps)
+
+    assert new_state.activity == "docked"
+    assert new_state.task_status == "Completed"
+    assert new_state.active_room_ids == []
+    assert new_state.active_room_names == ""
+
+
+@patch("custom_components.robovac_mqtt.api.parser.decode")
+def test_mid_clean_washing_does_not_clear_active_targets(mock_decode):
+    """Test dock-side washing preserves the active room target."""
+    state = VacuumState(
+        activity="cleaning",
+        active_room_ids=[1],
+        active_room_names="Kitchen1",
+    )
+
+    mock_status = MagicMock()
+    mock_status.state = 5
+    mock_status.cleaning.state = 1
+    mock_status.go_wash.mode = 1
+    mock_status.mode.value = 1
+    mock_status.HasField.side_effect = lambda field: field in {
+        "mode",
+        "charging",
+        "cleaning",
+        "go_wash",
+        "station",
+    }
+    mock_status.station.HasField.return_value = True
+    mock_decode.return_value = mock_status
+
+    dps = {DPS_MAP["WORK_STATUS"]: "encoded"}
+    new_state, _ = update_state(state, dps)
+
+    assert new_state.activity == "docked"
+    assert new_state.task_status == "Washing Mop"
+    assert new_state.active_room_ids == [1]
+    assert new_state.active_room_names == "Kitchen1"
+
+
+@patch("custom_components.robovac_mqtt.api.parser.decode")
+def test_completed_docked_state_clears_active_targets(mock_decode):
+    """Test completed docked states clear the active room target."""
+    state = VacuumState(
+        activity="docked",
+        task_status="Washing Mop",
+        active_room_ids=[1],
+        active_room_names="Kitchen1",
+    )
+
+    mock_status = MagicMock()
+    mock_status.state = 3
+    mock_status.HasField.side_effect = lambda field: field in {"charging"}
+    mock_decode.return_value = mock_status
+
+    dps = {DPS_MAP["WORK_STATUS"]: "encoded"}
+    new_state, _ = update_state(state, dps)
+
+    assert new_state.activity == "docked"
+    assert new_state.task_status == "Completed"
+    assert new_state.active_room_ids == []
+    assert new_state.active_room_names == ""
+
+
+def test_empty_room_clean_echo_preserves_existing_active_rooms():
+    """Test empty room-clean echoes do not wipe optimistic target state."""
+    state = VacuumState(
+        active_room_ids=[1],
+        active_room_names="Kitchen1",
+        rooms=[{"id": 1, "name": "Kitchen1"}],
+    )
+
+    dps = {DPS_MAP["PLAY_PAUSE"]: "AggB"}
+    new_state, changes = update_state(state, dps)
+
+    assert new_state.active_room_ids == [1]
+    assert new_state.active_room_names == "Kitchen1"
+    assert "active_room_ids" not in changes
