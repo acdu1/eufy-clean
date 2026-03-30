@@ -54,7 +54,7 @@ def _decode_varint(data: bytes, pos: int) -> tuple[int, int]:
         b = data[pos]
         value |= (b & 0x7F) << shift
         pos += 1
-        if not (b & 0x80):
+        if not b & 0x80:
             return value, pos
         shift += 7
     return value, pos
@@ -446,10 +446,7 @@ def _process_other_dps(
                     _LOGGER.debug("DPS 172: None value (initial state)")
                 else:
                     _LOGGER.debug("Received MULTI_MAP_MANAGE (DPS 172): %.100s", value)
-                    map_result = _parse_multi_map_response(value)
-                    if map_result:
-                        changes.update(map_result)
-                        _track_field(state, changes, "map_image")
+                    _parse_multi_map_response(value)
 
             elif key == DPS_MAP["UNSETTING"]:
                 settings = decode(UnisettingResponse, value)
