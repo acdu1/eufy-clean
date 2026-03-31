@@ -95,8 +95,14 @@ def _parse_robot_telemetry(value: str) -> dict[str, Any] | None:
         field 4: uint32  map X coordinate
         field 5: uint32  map Y coordinate
         field 6: bytes   additional data (2 packed varints)
+
+    See docs/DPS_179_TELEMETRY.md for detailed format documentation.
     """
-    raw = base64.b64decode(value)
+    try:
+        raw = base64.b64decode(value)
+    except Exception:
+        _LOGGER.debug("Failed to decode DPS 179 base64: %.50s", value)
+        return None
     _length, pos = _decode_varint(raw, 0)
     outer = _decode_raw_varints(raw[pos:])
     sub_bytes = outer.get(2)

@@ -356,3 +356,64 @@ def test_empty_room_clean_echo_preserves_existing_active_rooms():
     assert new_state.active_room_ids == [1]
     assert new_state.active_room_names == "Kitchen1"
     assert "active_room_ids" not in changes
+
+
+def test_update_state_device_info_dps169():
+    """Test parsing DPS 169 (DeviceInfo) for MAC, WiFi SSID, and WiFi IP."""
+    state = VacuumState()
+    # Real DPS 169 payload from a T2351 (X10 Pro Omni)
+    dps = {
+        DPS_MAP["MAP_MANAGE"]: "vgEKF2V1ZnkgQ2xlYW4gWDEwIFBybyBPbW5pGhFjMDo"
+        "4YTo2MDoyMzo4MzpkOSIGMy40Ljg1KAMyCkx1ZnRIYW1uZW46CjEwLjEuMC4xMDZCKD"
+        "A5OTM2ZDFkNjdhZjE2YWJlYzJiNDdhOTZjYmU5M2RiNTY4NmM2YzhaCgoGMS4yLjI3EA"
+        "hiLQgBEgQIAhADGgQIAhAPIgQIARABMgQIARADOgQIARABQgQIARADUgUIARCzJGoJVDI"
+        "zNTFfb3Rh"
+    }
+    new_state, changes = update_state(state, dps)
+    assert new_state.device_mac == "c0:8a:60:23:83:d9"
+    assert new_state.wifi_ssid == "LuftHamnen"
+    assert new_state.wifi_ip == "10.1.0.106"
+    assert "wifi_ssid" in new_state.received_fields
+    assert "wifi_ip" in new_state.received_fields
+
+
+def test_update_state_wifi_signal_dps176():
+    """Test parsing WiFi signal strength from DPS 176 (UnisettingResponse)."""
+    from custom_components.robovac_mqtt.proto.cloud.unisetting_pb2 import (
+        UnisettingResponse,
+    )
+    from custom_components.robovac_mqtt.utils import encode
+
+    # Build a UnisettingResponse with ap_signal_strength=80 (i.e. -60 dBm)
+    settings = UnisettingResponse(ap_signal_strength=80)
+    encoded = encode(UnisettingResponse, {"ap_signal_strength": 80})
+
+    state = VacuumState()
+    dps = {DPS_MAP["UNSETTING"]: encoded}
+    new_state, changes = update_state(state, dps)
+    assert new_state.wifi_signal == -60.0
+    assert "wifi_signal" in new_state.received_fields
+
+
+def test_update_state_robot_position_dps179():
+    """Test parsing robot position from DPS 179 telemetry."""
+    state = VacuumState()
+    # Real DPS 179 payload from active cleaning session
+    dps = {"179": "HBIaOhgIlrujzgYQYxhiIPx9KIcOMgbO3QKg6gI="}
+    new_state, changes = update_state(state, dps)
+    assert "robot_position_x" in changes
+    assert "robot_position_y" in changes
+    # Raw unsigned varint values from undocumented telemetry format
+    assert isinstance(new_state.robot_position_x, int)
+    assert isinstance(new_state.robot_position_y, int)
+    assert "robot_position" in new_state.received_fields
+
+
+def test_known_unprocessed_dps_does_not_crash():
+    """Test that known-but-unprocessed DPS keys are handled gracefully."""
+    state = VacuumState()
+    # DPS 155 (DIRECTION), 156 (MULTI_MAP_SW), 161 (unknown) are in KNOWN_UNPROCESSED_DPS
+    dps = {"155": None, "156": True, "161": 80}
+    new_state, changes = update_state(state, dps)
+    # Should not crash and state should be unchanged (except raw_dps)
+    assert new_state.activity == "idle"
