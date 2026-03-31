@@ -569,6 +569,7 @@ def _map_task_status(status: WorkStatus, dock_status: str | None = None) -> str:
                 "Recycling waste water",
             ):
                 return "Washing Mop"
+            return "Paused"
 
         # If not resumable and cleaning field is absent, the task is complete
         if status.HasField("station") and status.station.HasField(

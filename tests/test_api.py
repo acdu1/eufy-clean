@@ -18,7 +18,11 @@ from custom_components.robovac_mqtt.api.parser import update_state
 from custom_components.robovac_mqtt.const import DPS_MAP, EUFY_CLEAN_CONTROL
 from custom_components.robovac_mqtt.models import VacuumState
 from custom_components.robovac_mqtt.proto.cloud.error_code_pb2 import ErrorCode
+from custom_components.robovac_mqtt.proto.cloud.unisetting_pb2 import (
+    UnisettingResponse,
+)
 from custom_components.robovac_mqtt.proto.cloud.work_status_pb2 import WorkStatus
+from custom_components.robovac_mqtt.utils import encode
 
 
 def test_update_state_battery():
@@ -319,6 +323,37 @@ def test_mid_clean_washing_does_not_clear_active_targets(mock_decode):
 
 
 @patch("custom_components.robovac_mqtt.api.parser.decode")
+def test_charging_paused_state_does_not_clear_active_targets(mock_decode):
+    """Test paused charging during wash preparation does not clear target."""
+    state = VacuumState(
+        activity="cleaning",
+        active_room_ids=[1],
+        active_room_names="Kitchen1",
+    )
+
+    mock_status = MagicMock()
+    mock_status.state = 3
+    mock_status.cleaning.state = 1
+    mock_status.HasField.side_effect = lambda field: field in {
+        "charging",
+        "cleaning",
+        "station",
+        "mode",
+    }
+    mock_status.mode.value = 1
+    mock_status.station.HasField.return_value = False
+    mock_decode.return_value = mock_status
+
+    dps = {DPS_MAP["WORK_STATUS"]: "encoded"}
+    new_state, _ = update_state(state, dps)
+
+    assert new_state.activity == "docked"
+    assert new_state.task_status == "Paused"
+    assert new_state.active_room_ids == [1]
+    assert new_state.active_room_names == "Kitchen1"
+
+
+@patch("custom_components.robovac_mqtt.api.parser.decode")
 def test_completed_docked_state_clears_active_targets(mock_decode):
     """Test completed docked states clear the active room target."""
     state = VacuumState(
@@ -369,7 +404,7 @@ def test_update_state_device_info_dps169():
         "hiLQgBEgQIAhADGgQIAhAPIgQIARABMgQIARADOgQIARABQgQIARADUgUIARCzJGoJVDI"
         "zNTFfb3Rh"
     }
-    new_state, changes = update_state(state, dps)
+    new_state, _ = update_state(state, dps)
     assert new_state.device_mac == "c0:8a:60:23:83:d9"
     assert new_state.wifi_ssid == "LuftHamnen"
     assert new_state.wifi_ip == "10.1.0.106"
@@ -379,18 +414,12 @@ def test_update_state_device_info_dps169():
 
 def test_update_state_wifi_signal_dps176():
     """Test parsing WiFi signal strength from DPS 176 (UnisettingResponse)."""
-    from custom_components.robovac_mqtt.proto.cloud.unisetting_pb2 import (
-        UnisettingResponse,
-    )
-    from custom_components.robovac_mqtt.utils import encode
-
     # Build a UnisettingResponse with ap_signal_strength=80 (i.e. -60 dBm)
-    settings = UnisettingResponse(ap_signal_strength=80)
     encoded = encode(UnisettingResponse, {"ap_signal_strength": 80})
 
     state = VacuumState()
     dps = {DPS_MAP["UNSETTING"]: encoded}
-    new_state, changes = update_state(state, dps)
+    new_state, _ = update_state(state, dps)
     assert new_state.wifi_signal == -60.0
     assert "wifi_signal" in new_state.received_fields
 
@@ -414,6 +443,6 @@ def test_known_unprocessed_dps_does_not_crash():
     state = VacuumState()
     # DPS 155 (DIRECTION), 156 (MULTI_MAP_SW), 161 (unknown) are in KNOWN_UNPROCESSED_DPS
     dps = {"155": None, "156": True, "161": 80}
-    new_state, changes = update_state(state, dps)
+    new_state, _ = update_state(state, dps)
     # Should not crash and state should be unchanged (except raw_dps)
     assert new_state.activity == "idle"
