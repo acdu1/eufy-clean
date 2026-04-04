@@ -42,6 +42,7 @@ from ..proto.cloud.undisturbed_pb2 import UndisturbedResponse
 from ..proto.cloud.unisetting_pb2 import UnisettingResponse
 from ..proto.cloud.universal_data_pb2 import UniversalDataResponse
 from ..proto.cloud.work_status_pb2 import WorkStatus
+from ..svg_stream import EnhancedSVGGenerator
 from ..utils import decode, deduplicate_names
 
 # pylint: disable=too-many-lines,too-many-nested-blocks
@@ -805,79 +806,15 @@ def _infer_current_room(
 def _generate_position_svg(
     rooms: list[dict[str, Any]], current_room: str, confidence: float
 ) -> str:
-    """Generate a simple SVG visualization of robot position.
+    """Generate SVG visualization of robot position.
 
-    Creates a basic topological map showing rooms as rectangles and robot position.
-    Since we don't have visual map data, this creates a simple layout.
+    Uses lightweight generator optimized for Home Assistant Green.
     """
-    if not rooms:
-        return ""
-
-    # Create a simple grid layout for rooms
-    num_rooms = len(rooms)
-    cols = min(3, max(1, int(num_rooms**0.5)))
-    rows = (num_rooms + cols - 1) // cols
-
-    room_width = 120
-    room_height = 80
-    padding = 10
-    svg_width = cols * (room_width + padding) + padding
-    svg_height = rows * (room_height + padding) + padding
-
-    svg_parts = [
-        f'<svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">',
-        "<defs>",
-        "<style>",
-        ".room { fill: #e3f2fd; stroke: #1976d2; stroke-width: 2; }",
-        ".room.active { fill: #fff3e0; stroke: #f57c00; stroke-width: 3; }",
-        ".room-label { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; fill: #1976d2; }",
-        ".robot { fill: #d32f2f; stroke: #ffffff; stroke-width: 2; }",
-        ".confidence { font-family: Arial, sans-serif; font-size: 10px; text-anchor: middle; fill: #666; }",
-        "</style>",
-        "</defs>",
-    ]
-
-    # Draw rooms in a grid
-    for i, room in enumerate(rooms):
-        row = i // cols
-        col = i % cols
-
-        x = col * (room_width + padding) + padding
-        y = row * (room_height + padding) + padding
-
-        room_name = room.get("name", f"Room {room.get('id', i+1)}")
-        is_current_room = room_name == current_room
-
-        # Room rectangle
-        css_class = "room active" if is_current_room else "room"
-        svg_parts.append(
-            f'<rect x="{x}" y="{y}" width="{room_width}" height="{room_height}" class="{css_class}" rx="5"/>'
-        )
-
-        # Room label
-        text_x = x + room_width / 2
-        text_y = y + room_height / 2 + 5
-        svg_parts.append(
-            f'<text x="{text_x}" y="{text_y}" class="room-label">{room_name}</text>'
-        )
-
-        # Robot indicator (only in current room)
-        if is_current_room and confidence > 0:
-            robot_x = x + room_width / 2
-            robot_y = y + room_height / 2 - 10
-            svg_parts.append(
-                f'<circle cx="{robot_x}" cy="{robot_y}" r="8" class="robot"/>'
-            )
-
-            # Confidence indicator
-            conf_y = y + room_height - 15
-            conf_text = f"{int(confidence * 100)}%"
-            svg_parts.append(
-                f'<text x="{text_x}" y="{conf_y}" class="confidence">{conf_text}</text>'
-            )
-
-    svg_parts.append("</svg>")
-    return "\n".join(svg_parts)
+    return EnhancedSVGGenerator.generate(
+        rooms=rooms,
+        current_room=current_room,
+        confidence=confidence,
+    )
 
 
 def _parse_map_data(value: Any) -> dict[str, Any] | None:
