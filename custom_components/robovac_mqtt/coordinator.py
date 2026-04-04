@@ -21,6 +21,7 @@ from .api.cloud import EufyLogin
 from .api.parser import update_state
 from .const import DOMAIN
 from .models import VacuumState
+from .streaming import StreamingManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
         self._pending_dock_status: str | None = None
         self.last_seen_segments: list[Any] | None = None
         self._store = Store(hass, 1, f"{DOMAIN}.{self.device_id}")
+        self.streaming_manager = StreamingManager(self.device_name)
 
         if dps := device_info.get("dps"):
             self.data, _ = update_state(self.data, dps)
@@ -106,6 +108,7 @@ class EufyCleanCoordinator(DataUpdateCoordinator[VacuumState]):
             self.client.set_on_message(self._handle_mqtt_message)
             await self.client.connect()
             await self.async_load_storage()
+            await self.streaming_manager.start()
 
         except Exception as e:
             _LOGGER.error(

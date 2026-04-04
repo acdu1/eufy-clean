@@ -12,6 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from .api.cloud import EufyLogin
 from .const import DOMAIN
 from .coordinator import EufyCleanCoordinator
+from .views import RobovacSVGStreamView, RobovacSVGViewerView
 
 PLATFORMS: list[Platform] = [
     Platform.VACUUM,
@@ -117,6 +118,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {"coordinators": coordinators}
 
+    # Register HTTP views for SVG streaming
+    if coordinators:
+        stream_view = RobovacSVGStreamView()
+        stream_view.streaming_manager = coordinators[0].streaming_manager
+        hass.http.register_view(RobovacSVGViewerView)
+        hass.http.register_view(stream_view)
+
     # Clean up migrated data from config entry (skip for multi-device to avoid
     # deleting data that was intentionally not migrated)
     if "last_seen_segments" in entry.data and not is_multi_device:
@@ -141,6 +149,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if data and "coordinators" in data:
             for coordinator in data["coordinators"]:
                 coordinator.async_shutdown_timers()
+                await coordinator.streaming_manager.stop()
                 if coordinator.client:
                     await coordinator.client.disconnect()
 
