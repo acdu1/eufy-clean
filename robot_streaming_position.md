@@ -4,11 +4,7 @@ LIGHTWEIGHT ROBOT POSITION STREAMING FOR EUFY CLEAN
 This module provides lightweight HTTP-based SVG streaming for robot position
 visualization, optimized for low-power devices with:
 
-✅ NO external dependencies (no PIL, cairosvg, av, GStreamer)
-✅ Pure async Python - no threading overhead
-✅ Minimal memory footprint (< 1MB per stream)
-✅ Updates every 2 seconds
-✅ ~85% smaller file sizes than image encoding
+NO external dependencies (no PIL, cairosvg, av, GStreamer), Pure async Python - no threading overhead, Minimal memory footprint (< 1MB per stream), Updates every 2 seconds, ~85% smaller file sizes than image encoding
 
 ## Architecture
 
@@ -47,7 +43,7 @@ http://homeassistant.local:8123/api/custom_component/robovac_mqtt/stream
 
 ```yaml
 # Get current SVG in templates
-{{ state_attr('sensor.robovac_x10_pro_omni_robot_position_svg', 'svg_content') }}
+{{ state_attr('sensor.{robot_name}_robot_position_svg', 'svg_content') }}
 ```
 
 ## Performance
